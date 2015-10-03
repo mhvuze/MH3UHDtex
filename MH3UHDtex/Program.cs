@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -105,7 +106,7 @@ namespace MH3UHDtex
                     int tmp_pxinfo1;
                     int tmp_pxinfo2;
                     int tmp_size;
-                    System.IO.FileStream temp_gtx = new System.IO.FileStream(output + ".gtx", System.IO.FileMode.Create, System.IO.FileAccess.Write);
+                    System.IO.FileStream temp_gtx = new System.IO.FileStream(input + ".gtx", System.IO.FileMode.Create, System.IO.FileAccess.Write);
                     BinaryWriter wgtx = new BinaryWriter(temp_gtx);
 
                     temp_gtx.Write(gtx_header, 0, gtx_header.Length);
@@ -114,7 +115,7 @@ namespace MH3UHDtex
                     wgtx.Write(ToInt32BigEndian(BitConverter.GetBytes(height), 0));
                     wgtx.Write(gtx_insert1);
 
-                    if (px_type == 0x0C)
+                    if (px_type == 0x0C)        // GX2_SURFACE_FORMAT_T_BC3_UNORM
                     {
                         tmp_type = 51;
                         tmp_fmt = 0xCC0003FF;
@@ -122,7 +123,7 @@ namespace MH3UHDtex
                         tmp_pxinfo2 = 256;
                         tmp_size = (width * height * 8) / 8;
                     }
-                    else if (px_type == 0x0B)
+                    else if (px_type == 0x0B)   // GX2_SURFACE_FORMAT_T_BC1_UNORM
                     {
                         tmp_type = 49;
                         tmp_fmt = 0xC40003FF;
@@ -149,6 +150,19 @@ namespace MH3UHDtex
                     wgtx.Write(gtx_insert6);
                     temp_gtx.Write(px_data, 0, tmp_size);
                     wgtx.Write(gtx_footer);
+
+                    wgtx.Close();
+                    temp_gtx.Close();
+
+                    // Convert gtx to dds
+                    String arguments = @"-i " + input + ".gtx " + "-f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o " + output;
+                    ProcessStartInfo texconv2_si = new ProcessStartInfo("TexConv2.exe");
+                    texconv2_si.Arguments = arguments;
+                    Process texconv2 = Process.Start(texconv2_si);
+                    texconv2.WaitForExit();
+                    
+                    File.Delete(input + ".gtx");
+                    Console.WriteLine("INFO: Conversion done.\n");
                 }
 
 
