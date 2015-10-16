@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+using me.andburn.DDSReader;
 
 namespace MH3UHDtex
 {
@@ -28,6 +25,18 @@ namespace MH3UHDtex
             string mode;
 
             Console.WriteLine("\nMH3UHDtex by Vuze\n");
+
+            // Check dependencies
+            if (!File.Exists("TexConv2.exe") || !File.Exists("gfd.dll") || !File.Exists("texUtils.dll"))
+            {
+                Console.Write("ERROR: TexConv2 or one of its dependencies is missing.\n");
+                return;
+            }
+            if (!File.Exists("DDSReader.dll"))
+            {
+                Console.Write("ERROR: DDSReader is missing.\n");
+                return;
+            }
 
             // Handle argument warnings
             if (args.Length > 3)
@@ -84,6 +93,13 @@ namespace MH3UHDtex
 
                     Console.WriteLine("INFO: " + width + "x" + height + "px, Type: " + px_type + "\n");
 
+                    // Handle CM textures
+                    if (cmflag1 != 0 || cmflag2 != 0)
+                    {
+                        Console.WriteLine("ERROR: CM textures cannot be processed.\n");
+                        return;
+                    }
+
                     // Save image data to new array
                     rinput.BaseStream.Seek(0x10, SeekOrigin.Begin);
                     byte[] px_data = new byte[data.Length - 0x10];
@@ -101,11 +117,13 @@ namespace MH3UHDtex
                     var gtx_insert5 = new byte[] { 0x06, 0x88, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x10, 0x42, 0x4C, 0x4B, 0x7B, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0B };
                     var gtx_insert6 = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
                     var gtx_footer = new byte[] { 0x42, 0x4C, 0x4B, 0x7B, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+                    
                     int tmp_type;
                     uint tmp_fmt;
                     int tmp_pxinfo1;
                     int tmp_pxinfo2;
                     int tmp_size;
+
                     System.IO.FileStream temp_gtx = new System.IO.FileStream(input + ".gtx", System.IO.FileMode.Create, System.IO.FileAccess.Write);
                     BinaryWriter wgtx = new BinaryWriter(temp_gtx);
 
@@ -155,13 +173,19 @@ namespace MH3UHDtex
                     temp_gtx.Close();
 
                     // Convert gtx to dds
-                    String arguments = @"-i " + input + ".gtx " + "-f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o " + output;
+                    String arguments = @"-i " + input + ".gtx " + "-f GX2_SURFACE_FORMAT_TCS_R8_G8_B8_A8_UNORM -o " + input + ".dds";
                     ProcessStartInfo texconv2_si = new ProcessStartInfo("TexConv2.exe");
                     texconv2_si.Arguments = arguments;
                     Process texconv2 = Process.Start(texconv2_si);
                     texconv2.WaitForExit();
-                    
                     File.Delete(input + ".gtx");
+
+                    // Convert dds to png
+                    byte[] dds_data = File.ReadAllBytes(input + ".dds");
+                    Bitmap bmp = DDSReader.LoadImage(dds_data);
+                    bmp.Save(output);
+                    File.Delete(input + ".dds");
+
                     Console.WriteLine("INFO: Conversion done.\n");
                 }
 
